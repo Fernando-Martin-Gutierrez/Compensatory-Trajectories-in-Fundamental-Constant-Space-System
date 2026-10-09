@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "multiverse-equilibrium-sim"
+version = "0.1.0"
+description = "Computational framework to explore covariant fundamental physical constants and multiverse viability"
+authors = [{ name = "Multiverse Research Team" }]
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "numpy>=1.26.0",
+    "scipy>=1.12.0",
+    "numba>=0.59.0",
+    "matplotlib>=3.8.0",
+    "rich>=13.0.0",
+]
+
+[project.scripts]
+multiverse-sim = "multiverse.cli:main"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]

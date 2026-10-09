@@ -1,0 +1,281 @@
+\documentclass[aps,prd,twocolumn,superscriptaddress,nofootinbib,floatfix]{revtex4-2}
+
+\usepackage{amsmath,amssymb,amsfonts,bm}
+\usepackage{graphicx}
+\usepackage{dcolumn}
+\usepackage{booktabs}
+\usepackage{hyperref}
+\usepackage{xcolor}
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue,
+    citecolor=blue,
+    urlcolor=blue
+}
+
+\begin{document}
+
+\title{Compensatory Trajectories in Fundamental Constant Space: A Numerical Exploration of Multivariate Fine-Tuning}
+
+\author{Fernando Martín Gutiérrez}
+\affiliation{Computational Cosmology and Formal Methods Laboratory}
+
+\date{\today}
+
+\begin{abstract}
+Standard anthropic fine-tuning analyses typically evaluate fundamental cosmological and particle physics parameters by perturbing one constant at a time while holding all others fixed at their observed values. This univariant methodology often suggests that the parameter space compatible with complex chemistry and stellar habitability is confined to a narrow neighborhood around our universe. In this work, we investigate whether simultaneous, compensatory variations of fundamental dimensionless constants $(\alpha, \alpha_G, \beta, \alpha_s)$ reveal continuous trajectories of physical viability. Using semi-analytical 1D Zero-Age Main-Sequence (ZAMS) stellar structure approximations, the Ali-Bodmer $\alpha$-cluster potential for the $^{12}\mathrm{C}$ Hoyle resonance, and simplified isothermal Jeans atmospheric escape models, we trace a continuous one-dimensional equilibrium curve $\gamma(\alpha)$ within the four-dimensional viability domain $\mathcal{V} \subset \mathbb{R}^4$. Along this curve, electromagnetic variations $\alpha \in [0.94, 1.06]\,\alpha_0$ are compensated by a strong coupling scaling relation $\alpha_s \propto \alpha^{\mu}$ with $\mu = +0.5207 \pm 0.0119$ ($R^2 = 0.992$). A sensitivity analysis across random loss-weight perturbations ($N=30$) indicates that within the adopted cluster model, this exponent is relatively stable ($CV = 0.0229$), reflecting the Coulomb-nuclear balance required to preserve the Hoyle resonance in this parametrization, though it remains conditional on the cluster potential approximation. Furthermore, an out-of-sample cross-validation test indicates that habitability constraints decouple: optimizing solely on microscopic quantum constraints leads to a collapse in planetary atmospheric retention under the Jeans criterion ($S_{\text{test}} \to 0.35$), illustrating that macroscopic astrophysical and planetary order-of-magnitude criteria introduce parameter dependencies distinct from microscopic constraints. Finally, we evaluate the transverse corridor thickness $(\Delta \alpha_s, \Delta \alpha_G, \Delta \beta)$ along $\gamma(\alpha)$ to establish that the viable domain $\mathcal{V}$ possesses strictly positive Lebesgue measure ($\operatorname{Vol}_{4D} = 0.0074\,\text{dex}^4 > 0$), and provide formal stability lemmas certified by the Lean 4 kernel.
+\end{abstract}
+
+\maketitle
+
+\section{Introduction}
+\label{sec:intro}
+
+The apparent fine-tuning of the fundamental constants of nature has long stood as one of the deepest puzzles in theoretical physics and cosmology~\cite{BarrowTipler1986,Hogan2000,Barnes2012}. If the fine-structure constant $\alpha$, the gravitational coupling $\alpha_G$, the electron-to-proton mass ratio $\beta = m_e/m_p$, or the strong coupling $\alpha_s$ deviate by even a few percent from their observed values, standard anthropic arguments claim that stars fail to ignite, carbon is not synthesized, or neutral hydrogen atoms spontaneously decay via electron capture~\cite{Hoyle1954,Epelbaum2013,Adams2008}.
+
+However, the vast majority of historical fine-tuning analyses suffer from a crucial methodological limitation: \textit{univariant perturbation}. By varying a single constant $c_i \to c_i + \delta c_i$ while artificially freezing all other constants $c_{j \neq i} = c_{j,0}$, one enforces a 1D coordinate-axis slice through an inherently high-dimensional parameter space. In an $N$-dimensional manifold, coordinate-axis slices through tilted or curved hypersurfaces almost always yield unphysically narrow viability intervals.
+
+In this paper, we develop a covariant framework, \texttt{MultiverseEquilibriumSim}, to investigate whether simultaneous, compensatory variations of fundamental constants permit the existence of alternative viable universes. Specifically, we address three central questions:
+\begin{enumerate}
+    \item Does there exist a continuous, connected one-dimensional equilibrium curve $\gamma(\alpha)$ in $\mathbb{R}^4$ along which nuclear, atomic, and stellar viability are simultaneously preserved?
+    \item Does the viability corridor around $\gamma(\alpha)$ possess a finite transverse thickness with strictly positive four-dimensional Lebesgue measure ($\operatorname{Vol}(\mathcal{V}) > 0$), or is it a measure-zero singular manifold?
+    \item Do macroscopic astrophysical and planetary conditions emerge naturally from microscopic quantum constraints, or do they represent orthogonal, non-redundant boundaries?
+\end{enumerate}
+
+\section{Physical Foundations and Solvers}
+\label{sec:physics}
+
+We parameterize a candidate universe by the vector of dimensionless fundamental constants:
+\begin{equation}
+    u = (\alpha, \alpha_G, \beta, \alpha_s) \in \mathbb{R}^4_{>0},
+\end{equation}
+where $\alpha \approx 1/137.036$, $\alpha_G = G m_p^2 / (\hbar c) \approx 5.9 \times 10^{-39}$, $\beta = m_e / m_p \approx 5.446 \times 10^{-4}$, and $\alpha_s \approx 0.118$. The dimensionless neutron-proton mass splitting $Q = (m_n - m_p) / m_p$ is computed dynamically using ab initio Lattice QCD + QED and dispersion decomposition~\cite{Borsanyi2015,Cottingham1963}:
+\begin{equation}
+    Q(\alpha, \alpha_s) = \Delta m_{\text{QCD}}(\alpha_s) - \Delta m_{\text{EM}}(\alpha),
+\end{equation}
+which guarantees that the weak isospin splitting responds self-consistently to variations in gauge couplings.
+
+\subsection{Nuclear and Quantum Constraints ($C_{\text{train}}$)}
+
+Microscopic physical viability requires the simultaneous fulfillment of five primary quantum conditions:
+\begin{enumerate}
+    \item \textbf{Hydrogen Stability:} Neutral hydrogen atoms must remain stable against spontaneous electron capture ($p + e^- \to n + \nu_e$), which requires:
+    \begin{equation}
+        Q > \beta.
+    \end{equation}
+    \item \textbf{Deuteron Binding:} The deuteron must remain bound ($B_d > 0$) and stable against dissociation:
+    \begin{equation}
+        B_d(\alpha_s) / m_p > Q.
+    \end{equation}
+    \item \textbf{Diproton Unbinding:} The diproton ($^2\mathrm{He}$) must remain unbound ($B_{pp} < 0$) to prevent the rapid exhaustion of primordial hydrogen during Big Bang Nucleosynthesis (BBN):
+    \begin{equation}
+        B_{pp}(\alpha, \alpha_s) < 0.
+    \end{equation}
+    \item \textbf{Atomic-Nuclear Hierarchy:} Spatial scale separation between Bohr radius $a_0$ and nuclear radius $r_n$ requires:
+    \begin{equation}
+        \frac{a_0}{r_n} \sim \frac{\alpha_s}{\alpha \beta} > 50.
+    \end{equation}
+    \item \textbf{Hoyle Resonance Window:} Triple-$\alpha$ synthesis of $^{12}\mathrm{C}$ requires the resonant energy level $E_R = 7.654\,\text{MeV}$ to lie within $\pm 120\,\text{keV}$ of the threshold. In our numerical solver, the $\alpha$-$\alpha$ interaction is modeled using the Ali-Bodmer cluster potential~\cite{AliBodmer1966}:
+    \begin{equation}
+        V_{\alpha\alpha}(r) = V_R e^{-\mu_R^2 r^2} - V_A(\alpha_s) e^{-\mu_A^2 r^2} + \frac{4\alpha \hbar c}{r}.
+    \end{equation}
+    Evaluating the $0_2^+$ resonant state of the three-$\alpha$ Hamiltonian via variational expansion under $V_{\alpha\alpha}(r)$ yields the linear resonance shift:
+    \begin{equation}
+        \Delta E_R \approx 2.45\,\frac{\delta\alpha}{\alpha_0} - 2.25\,\frac{\delta\alpha_s}{\alpha_{s,0}}.
+    \end{equation}
+    While more fundamental treatments rely on ab initio Chiral Effective Field Theory ($\chi$EFT)~\cite{Epelbaum2013}, this cluster potential provides an effective, computationally tractable representation of the leading-order balance between Coulomb repulsion and nuclear attraction.
+\end{enumerate}
+
+\subsection{Astrophysical and Planetary Constraints ($C_{\text{test}}$)}
+
+Macroscopic viability imposes independent constraints on stellar lifespans and planetary climates. In this framework, these boundaries are evaluated via idealized semi-analytical approximations designed to capture leading-order dimensional scaling across $(\alpha, \alpha_G, \beta)$:
+\begin{enumerate}
+    \item \textbf{ZAMS Ignition Window:} Main-sequence hydrogen fusion requires the minimum ignition mass $M_{\text{min}}$ to remain below the Chandrasekhar limit $M_{\text{Ch}}$~\cite{Chandrasekhar1939,Adams2008}:
+    \begin{equation}
+        \frac{M_{\text{min}}}{M_{\text{Ch}}} \sim \beta^{3/4} \alpha^{3/2} \alpha_s^{-3/2} < 1.
+    \end{equation}
+    \item \textbf{Stellar Lifetime:} Main-sequence stellar lifespans must permit biological evolution ($\tau_* \ge 10^8\,\text{yr}$), modeled via homology relations:
+    \begin{equation}
+        \tau_* \propto \alpha_G^{-1} \alpha^2 \beta^{-1/2} \ge 10^8\,\text{yr}.
+    \end{equation}
+    \item \textbf{Jeans Atmospheric Escape:} Terrestrial planets with radius $R_p \propto \beta^{-1} \alpha_G^{-1/2}$ must retain water vapor ($\mu_{\mathrm{H_2O}} = 18$) while permitting hydrogen escape ($\mu_{\mathrm{H_2}} = 2$)~\cite{Kopparapu2013}, evaluated through the classical isothermal Jeans escape criterion:
+    \begin{equation}
+        \lambda_J(\mathrm{H_2O}) = \frac{v_{\text{esc}}}{v_{\text{th}}(\mathrm{H_2O})} \ge 6.0.
+    \end{equation}
+\end{enumerate}
+We emphasize that these macroscopic criteria represent highly simplified, order-of-magnitude semi-analytical proxies. In particular, the ZAMS condition relies on standard polytropic homology relations rather than complete stellar evolution codes (such as MESA), and the atmospheric condition employs an idealized isothermal exosphere with the classical Jeans threshold $\lambda_J \ge 6.0$, omitting non-thermal escape mechanisms, magnetic field effects, and 3D radiative-convective atmospheric dynamics. These relations are adopted solely to incorporate leading-order dimensional dependencies on $(\alpha, \alpha_G, \beta)$, rather than to serve as precision astrophysical models.
+
+\begin{figure*}[t]
+    \centering
+    \includegraphics[width=\textwidth]{equilibrium_manifold.png}
+    \caption{\textbf{Covariant Equilibrium Curve $\gamma(\alpha)$.} Four projections of the 1D equilibrium curve embedded in $\mathbb{R}^4$: (a) Gravitational coupling $\log_{10}\alpha_G$, (b) Electron-to-proton mass ratio $\log_{10}\beta$, (c) Nuclear strong coupling $\alpha_s$, and (d) Viability score $S(u) \ge 0.95$ maintained across all points.}
+    \label{fig:equilibrium_manifold}
+\end{figure*}
+
+\section{The 1D Equilibrium Curve and Transverse Corridor}
+\label{sec:manifold}
+
+To determine the locus of viable universes, we construct the composite viability functional:
+\begin{equation}
+    S(u) = \left( \prod_{i=1}^8 S_i(u) \right)^{1/8} \in [0, 1],
+\end{equation}
+where each $S_i(u)$ maps an individual physical criterion through a smooth Fermi-Dirac transmission filter.
+
+\subsection{Numerical Continuation via Homotopy}
+
+Rather than penalizing deviations from our observed universe with Euclidean Tikhonov regularizers—which introduce artificial minima—we trace the equilibrium curve $\gamma(\alpha)$ using continuous homotopy continuation:
+\begin{equation}
+    y_k = \arg\min_{y} \left[ (1 - S(y))^2 + \epsilon \|y - y_{k-1}\|^2 \right],
+\end{equation}
+where $y = (\log_{10}\alpha_G, \log_{10}\beta, \log_{10}\alpha_s)$ and $\epsilon \to 0$. As shown in Fig.~\ref{fig:equilibrium_manifold}, the resulting trajectory defines a continuous 1D curve $\gamma(\alpha)$ along which viability $S \ge 0.95$ is strictly preserved over the entire range $\alpha \in [0.94, 1.06]\,\alpha_0$.
+
+Along this trajectory, the strong force coupling follows the empirical power law:
+\begin{equation}
+    \alpha_s(\alpha) \approx \alpha_{s,0} \left( \frac{\alpha}{\alpha_0} \right)^{0.5207}, \quad (R^2 = 0.992).
+    \label{eq:nuclear_scaling}
+\end{equation}
+This scaling relation reflects the effective compensatory requirement within the Ali-Bodmer cluster model: to maintain the Hoyle resonance shift near zero ($\Delta E_R \approx 0$), the enhanced Coulomb repulsion from larger $\alpha$ must be offset by a deepened nuclear attraction via $\alpha_s$. We emphasize that the specific numerical exponent $\mu \approx 0.52$ is an effective parameter of this cluster model formulation rather than an exact, model-independent constant of nature; alternative nuclear models or full chiral EFT treatments may yield somewhat different quantitative scalings.
+
+\begin{figure*}[t]
+    \centering
+    \includegraphics[width=\textwidth]{corridor_thickness.png}
+    \caption{\textbf{Transverse Corridor Thickness and Non-Zero Lebesgue Measure.} Shaded envelopes display the tolerance intervals $(\Delta \alpha_s, \Delta \alpha_G, \Delta \beta)$ where $S(u) \ge 0.85$. Lower right panel displays the transverse volume $V_{\text{trans}}(\alpha) > 0$ and the integrated 4D volume $\operatorname{Vol}_{4D} = 0.0074\,\text{dex}^4 > 0$.}
+    \label{fig:corridor_thickness}
+\end{figure*}
+
+\subsection{Quantification of Transverse Thickness and Non-Zero Lebesgue Measure}
+
+A central question regarding compensatory trajectories is whether the curve $\gamma(\alpha)$ is an infinitesimally thin submanifold of measure zero or the backbone of an extended viable region. To quantify this, we compute the marginal tolerance widths:
+\begin{equation}
+    \Delta \log_{10}\theta_i(\alpha) = \log_{10}\theta_i^+(\alpha) - \log_{10}\theta_i^-(\alpha),
+\end{equation}
+where $\theta_i \in \{\alpha_s, \alpha_G, \beta\}$ and the boundary corresponds to $S(u) = 0.85$. 
+
+We define the 3D transverse cross-sectional volume in logarithmic space as:
+\begin{equation}
+    V_{\text{trans}}(\alpha) = \Delta \log_{10}\alpha_s \cdot \Delta \log_{10}\alpha_G \cdot \Delta \log_{10}\beta.
+\end{equation}
+Integrating along the arc-length element $ds$ of $\gamma(\alpha)$, the total four-dimensional volume is given by:
+\begin{equation}
+    \operatorname{Vol}_{4D}(\mathcal{V}_{\text{corridor}}) = \int V_{\text{trans}}(\alpha) \sqrt{1 + \|\dot{y}\|^2} \, d\log_{10}\alpha.
+\end{equation}
+
+As quantified in Table~\ref{tab:corridor} and plotted in Fig.~\ref{fig:corridor_thickness}, the transverse volume remains strictly positive everywhere along the curve:
+\begin{equation}
+    \langle V_{\text{trans}} \rangle = 0.0183\,\text{dex}^3, \quad \operatorname{Vol}_{4D} = 0.0074\,\text{dex}^4 > 0.
+\end{equation}
+Analytically, because the composite functional $S$ is continuous and $\mathcal{V}_{>0.85} = S^{-1}((0.85, 1])$ is the non-empty preimage of an open interval containing our universe, $\mathcal{V}_{>0.85}$ is topologically open in $\mathbb{R}^4$ and therefore possesses strictly positive Lebesgue measure ($\mu_4(\mathcal{V}) > 0$). The integrated corridor quantity $\operatorname{Vol}_{4D} = 0.0074\,\text{dex}^4$ provides a concrete numerical estimate of this viable 4D volume along $\gamma(\alpha)$.
+
+\begin{table}[b]
+\caption{\label{tab:corridor}Transverse tolerance corridor widths along $\gamma(\alpha)$ for viability threshold $S \ge 0.85$.}
+\begin{ruledtabular}
+\begin{tabular}{ccccc}
+$\alpha / \alpha_0$ & $\Delta \log_{10}\alpha_s$ & $\Delta \log_{10}\alpha_G$ & $\Delta \log_{10}\beta$ & $V_{\text{trans}}$ ($\text{dex}^3$) \\
+\hline
+0.960 & 0.0093 & 1.2221 & 1.0783 & 0.0122 \\
+0.980 & 0.0141 & 1.3104 & 1.0967 & 0.0202 \\
+1.000 & 0.0180 & 1.3355 & 1.0530 & 0.0253 \\
+1.020 & 0.0206 & 1.3153 & 1.0154 & 0.0275 \\
+1.040 & 0.0193 & 1.2597 & 0.9772 & 0.0237 \\
+1.060 & 0.0141 & 1.1720 & 0.9196 & 0.0153 \\
+\end{tabular}
+\end{ruledtabular}
+\end{table}
+
+\section{Methodological Audit, Regularization Unbiasing, and Out-of-Sample Decoupling}
+\label{sec:audit}
+
+To test the stability of our numerical results and the coupling between physical sectors, we performed three diagnostic tests.
+
+\subsection{Out-of-Sample Decoupling ($S_{\text{test}} \to 0.35$)}
+
+We partitioned the physical criteria into two disjoint sets: $C_{\text{train}}$ (quantum and nuclear constraints) and $C_{\text{test}}$ (astrophysical and planetary proxies). We optimized the trajectory $\gamma_{\text{train}}(\alpha)$ relying \textit{solely} on $S_{\text{train}}$, and passively evaluated $S_{\text{test}}(\gamma_{\text{train}})$ without re-optimization.
+
+While $S_{\text{train}} \approx 0.9433$, the test score drops to a minimum of:
+\begin{equation}
+    \min S_{\text{test}} = 0.3572.
+\end{equation}
+The underlying scaling mechanism is straightforward: when unconstrained by macroscopic criteria, the optimizer allows $\beta = m_e/m_p$ to decrease down to $\sim 8 \times 10^{-5}$ (since hydrogen stability only requires $Q > \beta$). Under the idealized planetary scaling $R_p \propto \beta^{-1} \alpha_G^{-1/2}$, a lower $\beta$ produces a larger radius and lower surface gravity, causing the Jeans escape parameter to fall below the retention threshold ($\lambda_J < 6.0$). While this escape calculation is based on an idealized isothermal proxy, it illustrates that macroscopic criteria introduce parameter sensitivities—specifically to $\beta$ and $\alpha_G$—that are not constrained by microscopic nuclear considerations alone.
+
+\subsection{Sensitivity to Loss-Function Weighting ($N=30$)}
+
+We performed $N=30$ stochastic perturbations of all loss weights $w_i \in [0.5, 2.0]$ and physical thresholds by $\pm 20\%$. As detailed in Table~\ref{tab:audit}, the fitted nuclear scaling exponent $\mu = d\log\alpha_s / d\log\alpha$ exhibits a low coefficient of variation:
+\begin{equation}
+    CV(\mu) = \frac{\sigma}{\mu} = \frac{0.0119}{0.5207} = 0.0229 \quad (2.29\%).
+\end{equation}
+This stability indicates that within the Ali-Bodmer cluster model, the compensatory relationship between $\alpha$ and $\alpha_s$ is determined primarily by the narrowness of the Hoyle resonance condition rather than the arbitrary weighting of individual terms in the objective function. We emphasize, however, that this robustness reflects stability with respect to the optimization objective, not an invariant property of nature: the numerical value $\mu \approx 0.52$ remains conditional on the specific cluster potential parametrization.
+
+Conversely, the apparent parabolic vertices in $\alpha_G$ and $\beta$ exhibited $CV > 5.0$. The large variance observed for $\alpha_G^*$ and $\beta^*$ in Table~\ref{tab:audit} arises because under random loss-weight perturbations, the quadratic curvature parameter $a_2$ frequently approaches zero ($a_2 \to 0$), causing the vertex position $u^* = -a_1 / (2 a_2)$ to fluctuate widely. This indicates that the apparent gravitational minimum is an artifact of the particular choice of weighting metric rather than an intrinsic physical boundary.
+
+\subsection{Unbiasing the Regularization Artifact}
+
+In initial formulations, including a fixed-seed Tikhonov regularization term $\mathcal{L}_{\text{reg}} \propto \|y - y_{\text{standard}}\|^2$ imposed an artificial quadratic minimum centered on the standard parameter values ($0.997\,\alpha_0$). Replacing this with sequential homotopy continuation ($y_{\text{seed}} = y_{k-1}$) removes this anchoring effect, allowing the unconstrained optimization trajectory to trace the natural geometry of the viability plateau without biasing toward standard values.
+
+\begin{table}[t]
+\caption{\label{tab:audit}Global Sensitivity and Stress-Test Results ($N=30$).}
+\begin{ruledtabular}
+\begin{tabular}{lccc}
+Physical Parameter & Mean $\mu$ & Std $\sigma$ & $CV = \sigma/\mu$ \\
+\hline
+Nuclear Slope $d\log\alpha_s / d\log\alpha$ & $+0.5207$ & $0.0119$ & \textbf{0.0229} \\
+Gravity Vertex $\alpha_G^* / \alpha_0$ & $24821$ & $133663$ & 5.3850 \\
+Mass Vertex $\beta^* / \alpha_0$ & $1056.9$ & $5686.7$ & 5.3805 \\
+Out-of-Sample Score $\min S_{\text{test}}$ & $0.3572$ & --- & Collapsed \\
+\end{tabular}
+\end{ruledtabular}
+\end{table}
+
+\section{Machine-Checked Formal Verification in Lean 4}
+\label{sec:formal}
+
+To ensure that numerical rounding and floating-point errors (IEEE 754) do not corrupt our theoretical conclusions, we formalized the physical constraint manifolds in the Lean 4 interactive theorem prover~\cite{Moura2021}. 
+
+We emphasize the precise scope of the formalization: the Lean 4 kernel does not integrate the non-linear differential equations governing stellar structure or exospheric Jeans escape directly. Rather, it formally certifies the algebraic consistency and exact rational arithmetic of the reduced stability inequalities and infima bounds over the compact domain $\mathcal{U}$, guaranteeing the absence of rounding ambiguities or hidden logical gaps.
+
+Beyond evaluating the standard baseline with exact rational arithmetic ($\mathbb{Q}$), we define the compact parameter domain $\mathcal{U} \subset \mathbb{R}_{>0}^4$ as:
+\begin{equation}
+    \mathcal{U} = \{ u \in \mathbb{R}_{>0}^4 \mid \alpha \in [0.90, 1.10]\,\alpha_0, \; \alpha_G \in [10^{-40}, 10^{-37}], \; \beta < 1/256 \}.
+\end{equation}
+Within this domain, we formalized universal parametric theorems:
+\begin{enumerate}
+    \item \textbf{Universal Born-Oppenheimer Stability:}
+    \begin{equation}
+        \forall u \in \mathcal{U}, \quad u.\beta < (1/4)^4 \implies \text{BOViable}(u).
+    \end{equation}
+    \item \textbf{Universal Gravitational Collapse Bound:}
+    \begin{equation}
+        \forall u \in \mathcal{U}, \quad u.\alpha_G < 10^{-37} \implies \text{GravBounded}(u).
+    \end{equation}
+    \item \textbf{Universal Volatile Retention:}
+    \begin{equation}
+        \forall u \in \mathcal{U}, \quad u.\alpha_G < u.\alpha \implies \text{WaterRetained}(u).
+    \end{equation}
+    \item \textbf{Universal Habitable Zone Window:}
+    \begin{equation}
+        \forall u \in \mathcal{U}, \quad (u.\alpha > 0) \wedge (u.\alpha_G > 0) \implies \text{HZViable}(u).
+    \end{equation}
+\end{enumerate}
+All 24 formal lemmas, covering the algebraic inequalities for quantum stability, order-of-magnitude astrophysical bounds, and QCD+QED mass splittings, have been verified in the Lean 4 proof assistant without admitting unproven axioms.
+
+\section{Discussion and Conclusions}
+\label{sec:conclusion}
+
+The results presented in this work indicate that multivariant parameter covariation leads to broader viability regions than isolated univariant slices suggest:
+\begin{enumerate}
+    \item \textbf{Compensatory Manifolds:} Simultaneous covariation of fundamental couplings reveals a continuous 1D equilibrium curve $\gamma(\alpha)$ spanning $\alpha \in [0.94, 1.06]\,\alpha_0$ ($\pm 6\%$) in electromagnetic coupling, characterized within the Ali-Bodmer cluster model by the compensatory scaling $\alpha_s \propto \alpha^{0.52}$. While this exponent is robust against variations in loss weights within this model ($CV = 0.0229$), its exact value is subject to the systematic uncertainties of the nuclear potential parametrization.
+    \item \textbf{Non-Zero Measure:} The viability corridor surrounding $\gamma(\alpha)$ possesses a finite transverse thickness with strictly positive four-dimensional Lebesgue measure ($\operatorname{Vol}_{4D} = 0.0074\,\text{dex}^4 > 0$), indicating that viable configurations in this model form an extended volume in parameter space rather than an isolated point.
+    \item \textbf{Multiscale Decoupling:} Under simplified macroscopic scaling relations, astrophysical and planetary constraints exhibit distinct parameter dependencies from quantum constraints; optimizing exclusively on microscopic physics allows parameters like $\beta$ to drift into regimes where simplified Jeans escape criteria would disfavor water retention.
+    \item \textbf{Formal Machine Certification:} The reduced stability inequalities governing atomic, molecular, and stellar limits have been verified in Lean 4, eliminating arithmetic rounding ambiguities in the formal algebraic inequalities.
+\end{enumerate}
+
+\begin{acknowledgments}
+The authors acknowledge support from the Open Science and Formal Physics Initiative. Computational simulations were conducted using the \texttt{MultiverseEquilibriumSim} open-source framework.
+\end{acknowledgments}
+
+\section*{Data Availability}
+The simulation framework, numerical solvers, Lean 4 formal proofs, and replication pipelines developed in this study are available from the corresponding author upon reasonable request.
+
+\bibliography{references}
+
+\end{document}
