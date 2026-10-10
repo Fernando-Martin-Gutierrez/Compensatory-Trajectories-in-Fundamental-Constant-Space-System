@@ -28,6 +28,17 @@ from multiverse.solvers.planetary_habitability import (
     AtmosphericGasRetention,
 )
 
+from multiverse.solvers.chiral_nuclear import (
+    ChiralNuclearEngine,
+    ChiralResonanceResult,
+    ChiralLowEnergyConstants,
+    ChiralPotentialComponents,
+)
+from multiverse.solvers.hydrodynamic_escape import (
+    HydrodynamicAtmosphericEscapeEngine,
+    HydrodynamicEscapeResult,
+)
+
 __all__ = [
     "QuantumAtomSolver",
     "AtomicOrbitResult",
@@ -50,5 +61,11 @@ __all__ = [
     "PlanetaryHabitabilityResult",
     "HabitableZoneBoundaries",
     "AtmosphericGasRetention",
+    "ChiralNuclearEngine",
+    "ChiralResonanceResult",
+    "ChiralLowEnergyConstants",
+    "ChiralPotentialComponents",
+    "HydrodynamicAtmosphericEscapeEngine",
+    "HydrodynamicEscapeResult",
 ]
 

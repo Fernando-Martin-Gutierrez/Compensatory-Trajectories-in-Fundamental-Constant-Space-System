@@ -41,6 +41,10 @@ from multiverse.solvers.stellar_structure import (
     STEFAN_BOLTZMANN_SI,
     StellarEquilibriumSolution,
 )
+from multiverse.solvers.hydrodynamic_escape import (
+    HydrodynamicAtmosphericEscapeEngine,
+    HydrodynamicEscapeResult,
+)
 
 # Reference Astronomical & Geophyical Constants in SI
 EARTH_MASS_KG: float = 5.9722e24
@@ -96,11 +100,18 @@ class PlanetaryHabitabilityResult:
     is_atmosphere_viable: bool
     gas_retention: Dict[str, AtmosphericGasRetention]
     habitability_score: float
+    hydrodynamic_escape: Optional[HydrodynamicEscapeResult] = None
     diagnostics: Dict[str, float] = field(default_factory=dict)
 
 
 class PlanetaryHabitabilitySolver:
     """Evaluates photoclimatic habitable zones and atmospheric volatile retention."""
+
+    def __init__(
+        self,
+        hydro_engine: Optional[HydrodynamicAtmosphericEscapeEngine] = None,
+    ) -> None:
+        self.hydro_engine = hydro_engine or HydrodynamicAtmosphericEscapeEngine()
 
     # Volatile species: name -> molar mass in atomic mass units (amu)
     ATMOSPHERIC_VOLATILES: Dict[str, float] = {
@@ -294,14 +305,40 @@ class PlanetaryHabitabilitySolver:
         # Check CHZ location: conservative (runaway gh to max gh) or optimistic
         in_chz = chz.runaway_greenhouse_au <= orbital_radius_au <= chz.maximum_greenhouse_au
 
-        # 4. Atmospheric Volatiles Retention Analysis
+        # 4. Atmospheric Volatiles Retention Analysis (Jeans thermal escape)
         gases = self.evaluate_atmospheric_retention(T_eq, v_esc_kms, u)
         water_retained = gases["H2O"].is_retained_longterm
         hydrogen_escaped = not gases["H2"].is_retained_longterm
 
-        # An atmosphere is biologically viable if it retains heavy volatiles (H2O, N2, CO2)
-        # and has escaped light hydrogen gas (preventing hydrogen asphyxiation)
-        atmosphere_viable = water_retained and hydrogen_escaped and gases["N2"].is_retained_longterm
+        # 4b. Ab Initio Hydrodynamic Energy-Limited & Photo-Evaporative Atmospheric Escape
+        tau_star_yr = (
+            star_solution.main_sequence_lifetime_gyr * 1e9
+            if (star_solution and hasattr(star_solution, "main_sequence_lifetime_gyr"))
+            else 1.0e10
+        )
+        m_star_sol = (
+            star_solution.mass_solar
+            if (star_solution and hasattr(star_solution, "mass_solar"))
+            else (L_solar ** 0.25)
+        )
+        hydro_res = self.hydro_engine.evaluate_planetary_escape(
+            planet_mass_earth=planet_mass_earth,
+            a_orb_au=orbital_radius_au,
+            m_star_solar=m_star_sol,
+            l_star_solar=L_solar,
+            stellar_lifetime_yr=tau_star_yr,
+            u=u,
+        )
+
+        # An atmosphere is biologically viable if it retains heavy volatiles (H2O, N2, CO2),
+        # has escaped light hydrogen gas (preventing hydrogen asphyxiation),
+        # AND preserves its volatile ocean inventory against hydrodynamic EUV stripping.
+        atmosphere_viable = (
+            water_retained
+            and hydrogen_escaped
+            and gases["N2"].is_retained_longterm
+            and hydro_res.is_ocean_preserved
+        )
 
         # 5. Composite Habitability Score in [0, 1]
         # Temperature viability window around liquid water [260 K, 380 K]
@@ -315,9 +352,9 @@ class PlanetaryHabitabilitySolver:
             dist = min(abs(orbital_radius_au - chz.runaway_greenhouse_au), abs(orbital_radius_au - chz.maximum_greenhouse_au))
             chz_score = math.exp(-dist / 0.25)
 
-        # Volatiles retention score
+        # Volatiles retention score (penalizes if Jeans fails OR oceans are photo-evaporated)
         ret_score = 1.0 if atmosphere_viable else 0.1
-        if not water_retained:
+        if not water_retained or not hydro_res.is_ocean_preserved:
             ret_score = 0.0
 
         habitability_score = (temp_score * chz_score * ret_score) ** (1.0 / 3.0)
@@ -332,6 +369,11 @@ class PlanetaryHabitabilitySolver:
             "h2o_v_ratio": gases["H2O"].velocity_ratio,
             "h2_v_ratio": gases["H2"].velocity_ratio,
             "habitability_score": habitability_score,
+            "oceans_lost": hydro_res.oceans_equivalent_lost,
+            "hydro_loss_rate_kg_s": hydro_res.instantaneous_mass_loss_kg_s,
+            "tidal_k_tide": hydro_res.tidal_correction_k_tide,
+            "diffusion_limit_kg_s": hydro_res.diffusion_limited_loss_kg_s,
+            "is_ocean_preserved": 1.0 if hydro_res.is_ocean_preserved else 0.0,
         }
 
         return PlanetaryHabitabilityResult(
@@ -354,5 +396,6 @@ class PlanetaryHabitabilitySolver:
             is_atmosphere_viable=atmosphere_viable,
             gas_retention=gases,
             habitability_score=habitability_score,
+            hydrodynamic_escape=hydro_res,
             diagnostics=diagnostics,
         )

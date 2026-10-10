@@ -38,8 +38,9 @@ YEAR_IN_SECONDS: float = 3.15576e7           # 365.25 days in seconds
 CHRONO_SCALE_SI: float = HBAR_SI / (PROTON_MASS_SI * (SPEED_OF_LIGHT_SI ** 2))
 
 # Natural length scale: Compton wavelength of proton lambda_p = hbar / (m_p * c)
-# Natural length scale: Compton wavelength of proton lambda_p = hbar / (m_p * c)
 COMPTON_PROTON_SI: float = HBAR_SI / (PROTON_MASS_SI * SPEED_OF_LIGHT_SI)
+
+BOLTZMANN_K_SI: float = 1.380649e-23         # J / K (CODATA 2018/2022)
 
 
 def compute_dynamic_q(

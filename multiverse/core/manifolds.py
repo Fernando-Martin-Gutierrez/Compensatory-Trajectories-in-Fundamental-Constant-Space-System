@@ -105,6 +105,7 @@ class AnalyticalManifold:
         viability_threshold: float = 0.90,
         use_dynamic_q: bool = True,
         use_cluster_solver: bool = True,
+        use_chiral_eft: bool = False,
         weights: Optional[Sequence[float]] = None,
     ) -> None:
         self.min_lifetime_yr = min_lifetime_yr
@@ -113,6 +114,7 @@ class AnalyticalManifold:
         self.viability_threshold = viability_threshold
         self.use_dynamic_q = use_dynamic_q
         self.use_cluster_solver = use_cluster_solver
+        self.use_chiral_eft = use_chiral_eft
         self.cluster_solver = NuclearClusterSolver(hoyle_tolerance_mev=self.hoyle_tolerance_mev)
         if weights is not None:
             w_arr = np.array(weights, dtype=float)
@@ -196,9 +198,12 @@ class AnalyticalManifold:
         score_dinucleon = score_proton_stable * score_h_stable * score_d_stable * score_diproton
 
         # --------------------------------------------------------------------
-        # 2. Hoyle State / Stellar Nucleosynthesis Window (Ali-Bodmer Cluster Solver)
+        # 2. Hoyle State / Stellar Nucleosynthesis Window (Chiral EFT / Ali-Bodmer Cluster Solver)
         # --------------------------------------------------------------------
-        if self.use_cluster_solver:
+        if self.use_chiral_eft:
+            chiral_shift, _ = self.cluster_solver.compute_chiral_eft_hoyle_resonance(u.alpha, u.alpha_s)
+            hoyle_shift_mev = chiral_shift
+        elif self.use_cluster_solver:
             cluster_res = self.cluster_solver.compute_hoyle_resonance(u.alpha, u.alpha_s)
             hoyle_shift_mev = cluster_res.hoyle_shift_mev
         else:

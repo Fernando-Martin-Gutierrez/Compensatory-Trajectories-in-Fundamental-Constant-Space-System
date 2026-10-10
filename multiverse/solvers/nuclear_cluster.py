@@ -223,23 +223,35 @@ class NuclearClusterSolver:
         self,
         alpha: float = ALPHA_STANDARD,
         alpha_s: float = ALPHA_S_STANDARD,
-        c_alpha: float = 2.45,
-        c_s: float = 2.25,
+        c_alpha: Optional[float] = None,
+        c_s: Optional[float] = None,
     ) -> Tuple[float, bool]:
-        """Evaluates the Hoyle resonance shift using Chiral Effective Field Theory (χEFT).
+        """Evaluates the Hoyle resonance shift using the ab initio Chiral EFT variational engine.
         
-        Based on N2LO/N3LO Nuclear Lattice Effective Field Theory (Epelbaum et al. 2013),
-        where Delta E_R is governed by the chiral pion-exchange sensitivity and Coulomb repulsion:
-            Delta E_R = C_alpha * (delta_alpha / alpha_0) - C_s * (delta_alpha_s / alpha_s_0)
-            
-        Returns:
-            (hoyle_shift_mev, is_within_window)
+        Uses folded 1PE + 2PE chiral nuclear potential, pion mass scaling m_pi(alpha_s),
+        and Gaussian variational Rayleigh-Ritz solving.
         """
-        delta_a = (alpha - ALPHA_STANDARD) / ALPHA_STANDARD
-        delta_s = (alpha_s - ALPHA_S_STANDARD) / ALPHA_S_STANDARD
-        shift = c_alpha * delta_a - c_s * delta_s
-        is_viable = abs(shift) <= self.hoyle_tolerance_mev
-        return float(shift), bool(is_viable)
+        if c_alpha is not None and c_s is not None:
+            # Linear approximation fallback if explicit coefficients provided
+            delta_a = (alpha - ALPHA_STANDARD) / ALPHA_STANDARD
+            delta_s = (alpha_s - ALPHA_S_STANDARD) / ALPHA_S_STANDARD
+            shift = c_alpha * delta_a - c_s * delta_s
+            is_viable = abs(shift) <= self.hoyle_tolerance_mev
+            return float(shift), bool(is_viable)
+
+        res = self.solve_chiral_eft(alpha, alpha_s)
+        return float(res.hoyle_shift_mev), bool(res.is_within_hoyle_window)
+
+    def solve_chiral_eft(
+        self,
+        alpha: float = ALPHA_STANDARD,
+        alpha_s: float = ALPHA_S_STANDARD,
+    ):
+        """Solves the Hoyle resonance via ab initio Chiral EFT variational Hamiltonian."""
+        if not hasattr(self, "_chiral_engine"):
+            from multiverse.solvers.chiral_nuclear import ChiralNuclearEngine
+            self._chiral_engine = ChiralNuclearEngine(hoyle_tolerance_mev=self.hoyle_tolerance_mev)
+        return self._chiral_engine.solve_hoyle_resonance(alpha, alpha_s)
 
     def compute_scaling_gradient(
         self,

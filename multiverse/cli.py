@@ -30,6 +30,11 @@ if sys.platform == "win32":
     except Exception:
         pass
 
+# Ensure repository root is in sys.path
+_REPO_ROOT = str(Path(__file__).resolve().parent.parent)
+if _REPO_ROOT not in sys.path:
+    sys.path.insert(0, _REPO_ROOT)
+
 from multiverse.constants import (
     ALPHA_STANDARD,
     ALPHA_G_STANDARD,
@@ -45,6 +50,8 @@ from multiverse.solvers.stellar_structure import StellarStructureSolver
 from multiverse.solvers.orbital_dynamics import SymplecticOrbitalIntegrator
 from multiverse.solvers.cosmology_bbn import CosmologyBBNSolver, BBNResults
 from multiverse.solvers.planetary_habitability import PlanetaryHabitabilitySolver
+from multiverse.solvers.chiral_nuclear import ChiralNuclearEngine
+from multiverse.solvers.hydrodynamic_escape import HydrodynamicAtmosphericEscapeEngine
 from multiverse.optimizer.equilibrium_search import EquilibriumSearchOptimizer, report_scaling_laws
 from multiverse.optimizer.corridor import measure_equilibrium_corridor, format_corridor_report
 from multiverse.visualization.plotting import (
@@ -197,8 +204,28 @@ def cmd_standard(orbits: float = 100.0, with_lean: bool = True) -> int:
     )
     console.print(table_scores)
 
-    # 2. Big Bang Nucleosynthesis (BBN) Primordial Cosmology
-    console.print("\n[bold yellow]>>> [2/6] Simulating Radiation Era Expansion & BBN Primordial Nucleosynthesis...[/bold yellow]")
+    # 2. Ab Initio Chiral Effective Field Theory (chi-EFT) Nuclear Dynamics & Hoyle State
+    console.print("\n[bold yellow]>>> [2/7] Solucionando Dinamica Nuclear Chiral EFT & Estado de Hoyle (Hamiltoniano Variacional N2LO)...[/bold yellow]")
+    chiral_engine = ChiralNuclearEngine()
+    chiral_res = chiral_engine.solve_hoyle_resonance(u.alpha, u.alpha_s)
+
+    table_chiral = Table(title="Dinamica Nuclear Chiral EFT (chi-EFT N2LO / 1PE+2PE)", border_style="dim")
+    table_chiral.add_column("Parametro Nuclear", style="cyan")
+    table_chiral.add_column("Valor Computado", style="bold green" if chiral_res.is_within_hoyle_window else "bold red")
+    table_chiral.add_column("Fundamento Teorico / Observacion", style="dim")
+
+    table_chiral.add_row("Masa del Pion m_pi(alpha_s)", f"{chiral_res.pion_mass_mev:.2f} MeV", "Escalado quiral m_pi ~ (alpha_s / alpha_s0)^0.85")
+    table_chiral.add_row("Constante de Desintegracion f_pi", f"{chiral_res.pion_decay_mev:.2f} MeV", "f_pi ~ (alpha_s / alpha_s0)^0.50 (92.4 MeV estandar)")
+    table_chiral.add_row("Energia de Resonancia E_R (3-alpha)", f"{chiral_res.hoyle_resonance_energy_mev*1e3:.1f} keV", "Umbral sobre 3-alpha (379.5 keV experimental)")
+    table_chiral.add_row("Desplazamiento Delta E_R", f"{chiral_res.hoyle_shift_mev*1e3:+.2f} keV", "Ventana de tolerancia astrofisica +/-120 keV")
+    table_chiral.add_row("Sensibilidad Coulomb dE/d(ln alpha)", f"{chiral_res.dE_d_ln_alpha:.3f} MeV", "Derivada variacional de repulsion electromagnetica")
+    table_chiral.add_row("Sensibilidad Nuclear dE/d(ln alpha_s)", f"{chiral_res.dE_d_ln_alpha_s:.3f} MeV", "Derivada variacional de atraccion de intercambio pionico")
+    table_chiral.add_row("Pendiente Compensatoria mu_chiEFT", f"{chiral_res.compensatory_slope_mu:.4f}", "mu = - (dE/d ln alpha) / (dE/d ln alpha_s) (d Delta E_R = 0)")
+    table_chiral.add_row("Ventana de Resonancia de Hoyle", f"[{'bold green' if chiral_res.is_within_hoyle_window else 'bold red'}]{'ESTABLE' if chiral_res.is_within_hoyle_window else 'COLAPSADO'}[/]", "Permite sintesis equilibrada de Carbono-12 y Oxigeno-16")
+    console.print(table_chiral)
+
+    # 3. Big Bang Nucleosynthesis (BBN) Primordial Cosmology
+    console.print("\n[bold yellow]>>> [3/7] Simulating Radiation Era Expansion & BBN Primordial Nucleosynthesis...[/bold yellow]")
     bbn_solver = CosmologyBBNSolver()
     bbn_res = bbn_solver.solve_bbn(u)
 
@@ -216,8 +243,8 @@ def cmd_standard(orbits: float = 100.0, with_lean: bool = True) -> int:
     table_bbn.add_row("BBN Viability Status", f"[{'bold green' if bbn_res.is_bbn_viable else 'bold red'}]{'VIABLE' if bbn_res.is_bbn_viable else 'UNVIABLE'}[/]", "Prevents all-helium / all-neutron collapse")
     console.print(table_bbn)
 
-    # 3. Quantum Atom Solver & Multielectron SCF
-    console.print("\n[bold yellow]>>> [3/6] Solving Radial Schrödinger & Hartree-Fock SCF (Quantum Systems)...[/bold yellow]")
+    # 4. Quantum Atom Solver & Multielectron SCF
+    console.print("\n[bold yellow]>>> [4/7] Solving Radial Schrödinger & Hartree-Fock SCF (Quantum Systems)...[/bold yellow]")
     q_solver = QuantumAtomSolver()
     q_res = q_solver.solve(u)
 
@@ -252,8 +279,8 @@ def cmd_standard(orbits: float = 100.0, with_lean: bool = True) -> int:
 
     console.print(table_q)
 
-    # 4. Stellar Structure Solver & 1D ZAMS Shooting
-    console.print("\n[bold yellow]>>> [4/6] Integrating 1D ZAMS Stellar Structure & Stability Window...[/bold yellow]")
+    # 5. Stellar Structure Solver & 1D ZAMS Shooting
+    console.print("\n[bold yellow]>>> [5/7] Integrating 1D ZAMS Stellar Structure & Stability Window...[/bold yellow]")
     s_solver = StellarStructureSolver()
     s_res = s_solver.evaluate_stellar_viability(u)
 
@@ -286,8 +313,8 @@ def cmd_standard(orbits: float = 100.0, with_lean: bool = True) -> int:
 
     console.print(table_s)
 
-    # 5. Symplectic Orbital Dynamics
-    console.print(f"\n[bold yellow]>>> [5/6] Integrating 3-Body Symplectic Orbits ({orbits:.0f} orbits, 1PN Relativistic)...[/bold yellow]")
+    # 6. Symplectic Orbital Dynamics
+    console.print(f"\n[bold yellow]>>> [6/7] Integrating 3-Body Symplectic Orbits ({orbits:.0f} orbits, 1PN Relativistic)...[/bold yellow]")
     orb_solver = SymplecticOrbitalIntegrator(total_orbits=orbits)
     orb_res = orb_solver.run_simulation(u)
 
@@ -303,33 +330,49 @@ def cmd_standard(orbits: float = 100.0, with_lean: bool = True) -> int:
     table_orb.add_row("Orbital Stability Status", f"[{'bold green' if orb_res.is_orbitally_stable else 'bold red'}]{'STABLE' if orb_res.is_orbitally_stable else 'UNSTABLE'}[/]", "Long-term planetary orbit preservation")
     console.print(table_orb)
 
-    # 6. Planetary Geophysics, CHZ, and Atmospheric Retention
-    console.print("\n[bold yellow]>>> [6/6] Geofísica Planetaria, Zona Habitable Circunestelar (CHZ) y Retención Atmosférica...[/bold yellow]")
+    # 7. Planetary Geophysics, CHZ, and Atmospheric Escape
+    console.print("\n[bold yellow]>>> [7/7] Geofisica Planetaria, Zona Habitable Circunestelar (CHZ) y Escape Hidrodinamico...[/bold yellow]")
     hab_solver = PlanetaryHabitabilitySolver()
     hab_res = hab_solver.evaluate_habitability(u, star_solution=s_res.solar_analog, planet_mass_earth=1.0, orbital_radius_au=1.0)
 
-    table_hab = Table(title="Geofísica Planetaria & Retención Atmosférica de Jeans", border_style="dim")
-    table_hab.add_column("Propiedad Planetaria / Atmosférica", style="cyan")
+    table_hab = Table(title="Geofisica Planetaria & Retencion Atmosferica de Jeans", border_style="dim")
+    table_hab.add_column("Propiedad Planetaria / Atmosferica", style="cyan")
     table_hab.add_column("Valor Computado", style="bold green" if hab_res.is_atmosphere_viable else "bold red")
-    table_hab.add_column("Criterio Físico / Condición", style="dim")
+    table_hab.add_column("Criterio Fisico / Condicion", style="dim")
 
-    table_hab.add_row("Radio Planetario Rocoso R_p", f"{hab_res.planet_radius_earth:.3f} R_tierra ({hab_res.planet_radius_m*1e-3:.0f} km)", "Ecuación de estado roca-hierro R ~ M^0.27")
+    table_hab.add_row("Radio Planetario Rocoso R_p", f"{hab_res.planet_radius_earth:.3f} R_tierra ({hab_res.planet_radius_m*1e-3:.0f} km)", "Ecuacion de estado roca-hierro R ~ M^0.27")
     table_hab.add_row("Gravedad Superficial g", f"{hab_res.surface_gravity_earth:.3f} g_0 ({hab_res.surface_gravity_ms2:.2f} m/s^2)", "g = G * M_p / R_p^2")
     table_hab.add_row("Velocidad de Escape v_esc", f"{hab_res.escape_velocity_kms:.2f} km/s", "Barrera gravitatoria contra escape de Jeans")
     table_hab.add_row("Zona Habitable (CHZ Conservadora)", f"[{hab_res.habitable_zone.runaway_greenhouse_au:.3f} AU, {hab_res.habitable_zone.maximum_greenhouse_au:.3f} AU]", f"Ancho Delta r = {hab_res.habitable_zone.habitable_width_au:.3f} AU")
-    table_hab.add_row("Órbita Planetaria (r = 1.0 AU)", f"T_eq = {hab_res.equilibrium_temp_k:.1f} K, T_sup = {hab_res.surface_temp_k:.1f} K", f"En Zona Habitable: {hab_res.is_in_habitable_zone}")
+    table_hab.add_row("Orbita Planetaria (r = 1.0 AU)", f"T_eq = {hab_res.equilibrium_temp_k:.1f} K, T_sup = {hab_res.surface_temp_k:.1f} K", f"En Zona Habitable: {hab_res.is_in_habitable_zone}")
 
     h2 = hab_res.gas_retention["H2"]
     h2o = hab_res.gas_retention["H2O"]
     n2 = hab_res.gas_retention["N2"]
-    table_hab.add_row("Escape de Hidrógeno H2 (Primordial)", f"v_esc / v_th = {h2.velocity_ratio:.2f} (< 6.0: Escapado)", f"Retenido: {h2.is_retained_longterm} (Evita asfixia por H2)")
-    table_hab.add_row("Retención de Vapor de Agua H2O", f"v_esc / v_th = {h2o.velocity_ratio:.2f} (>= 6.0: Retenido)", f"Retenido geológico (>4 Gyr): {h2o.is_retained_longterm}")
-    table_hab.add_row("Retención de Nitrógeno N2 / CO2", f"v_esc / v_th = {n2.velocity_ratio:.2f} (>= 6.0: Retenido)", f"Estabilidad de atmósfera densa: {n2.is_retained_longterm}")
-    table_hab.add_row("Puntaje Global de Habitabilidad", f"{hab_res.habitability_score:.4f}", f"Atmósfera biológicamente viable: {hab_res.is_atmosphere_viable}")
+    table_hab.add_row("Escape de Hidrogeno H2 (Primordial)", f"v_esc / v_th = {h2.velocity_ratio:.2f} (< 6.0: Escapado)", f"Retenido: {h2.is_retained_longterm} (Evita asfixia por H2)")
+    table_hab.add_row("Retencion de Vapor de Agua H2O", f"v_esc / v_th = {h2o.velocity_ratio:.2f} (>= 6.0: Retenido)", f"Retenido geologico (>4 Gyr): {h2o.is_retained_longterm}")
+    table_hab.add_row("Retencion de Nitrogeno N2 / CO2", f"v_esc / v_th = {n2.velocity_ratio:.2f} (>= 6.0: Retenido)", f"Estabilidad de atmosfera densa: {n2.is_retained_longterm}")
+    table_hab.add_row("Puntaje Global de Habitabilidad", f"{hab_res.habitability_score:.4f}", f"Atmosfera biologicamente viable: {hab_res.is_atmosphere_viable}")
     console.print(table_hab)
+
+    if hab_res.hydrodynamic_escape:
+        hydro_info = hab_res.hydrodynamic_escape
+        table_hydro = Table(title="Evolucion Atmosferica Foto-evaporativa & Retencion de Oceanos (Erkaev-Watson)", border_style="dim")
+        table_hydro.add_column("Parametro Hidrodinamico", style="cyan")
+        table_hydro.add_column("Valor Computado", style="bold green" if hydro_info.is_ocean_preserved else "bold red")
+        table_hydro.add_column("Significado Fisico / Limite Geologico", style="dim")
+
+        table_hydro.add_row("Flujo Estelar EUV/XUV (a 1 Gyr)", f"{hydro_info.stellar_xuv_flux_w_m2*1e3:.2f} mW/m^2", "Irradiancia de alta energia foto-ionizante")
+        table_hydro.add_row("Tasa de Escape Transonico dM/dt", f"{hydro_info.instantaneous_mass_loss_kg_s:.2e} kg/s", "Escape hidrodinamico limitado por energia")
+        table_hydro.add_row("Factor de Marea Roche K_tide", f"{hydro_info.tidal_correction_k_tide:.4f}", "Correccion esferas de Hill Erkaev (K_tide <= 1)")
+        table_hydro.add_row("Limite de Difusion de Hunten", f"{hydro_info.diffusion_limited_loss_kg_s:.2e} kg/s", "Cuello de botella de difusion molecular en homopausa")
+        table_hydro.add_row("Perdida de Oceanos Acumulada", f"{hydro_info.oceans_equivalent_lost:.2f} Oceanos Terrestres (TO)", f"Reservorio inicial asumido: 5.0 TO (Perdidos: {hydro_info.oceans_equivalent_lost:.2f})")
+        table_hydro.add_row("Preservacion de Oceano Liquido", f"[{'bold green' if hydro_info.is_ocean_preserved else 'bold red'}]{'CONSERVADO (>1 TO)' if hydro_info.is_ocean_preserved else 'DESECADO POR FOTO-EVAPORACION'}[/]", "Hidrosfera planetaria viable a escala geologica (>4 Gyr)")
+        console.print(table_hydro)
 
     success = (
         (rep.total_score >= 0.95)
+        and chiral_res.is_within_hoyle_window
         and bbn_res.is_bbn_viable
         and s_res.has_stable_nuclear_burning
         and orb_res.is_orbitally_stable
@@ -648,6 +691,22 @@ def cmd_habitability(planet_mass: float = 1.0, orbit_au: float = 1.0, with_lean:
 
     console.print(table)
     console.print(table_gas)
+
+    if hab_res.hydrodynamic_escape:
+        hydro_info = hab_res.hydrodynamic_escape
+        table_hydro = Table(title="Evolución Atmosférica Foto-evaporativa & Retención de Océanos (Erkaev-Watson)", border_style="dim")
+        table_hydro.add_column("Parámetro Hidrodinámico", style="cyan")
+        table_hydro.add_column("Valor Computado", style="bold green" if hydro_info.is_ocean_preserved else "bold red")
+        table_hydro.add_column("Significado Físico / Límite Geológico", style="dim")
+
+        table_hydro.add_row("Flujo Estelar EUV/XUV (a 1 Gyr)", f"{hydro_info.stellar_xuv_flux_w_m2*1e3:.2f} mW/m^2", "Irradiancia de alta energía foto-ionizante")
+        table_hydro.add_row("Tasa de Escape Transónico dM/dt", f"{hydro_info.instantaneous_mass_loss_kg_s:.2e} kg/s", "Escape hidrodinámico limitado por energía")
+        table_hydro.add_row("Factor de Marea Roche K_tide", f"{hydro_info.tidal_correction_k_tide:.4f}", "Corrección esferas de Hill Erkaev (K_tide <= 1)")
+        table_hydro.add_row("Límite de Difusión de Hunten", f"{hydro_info.diffusion_limited_loss_kg_s:.2e} kg/s", "Cuello de botella de difusión molecular en homopausa")
+        table_hydro.add_row("Pérdida de Océanos Acumulada", f"{hydro_info.oceans_equivalent_lost:.2f} Océanos Terrestres (TO)", f"Reservorio inicial: 5.0 TO (Perdidos: {hydro_info.oceans_equivalent_lost:.2f})")
+        table_hydro.add_row("Preservación de Océano Líquido", f"[{'bold green' if hydro_info.is_ocean_preserved else 'bold red'}]{'CONSERVADO (>1 TO)' if hydro_info.is_ocean_preserved else 'DESECADO POR FOTO-EVAPORACION'}[/]", "Hidrosfera planetaria viable a escala geológica (>4 Gyr)")
+        console.print(table_hydro)
+
     console.print(
         f"[bold cyan]Puntaje de Habitabilidad Compuesto: {hab_res.habitability_score:.4f}[/bold cyan] "
         f"({'[bold green]HABITABLE[/bold green]' if hab_res.habitability_score > 0.8 else '[bold red]INHABITABLE[/bold red]'})\n"
@@ -922,6 +981,25 @@ def cmd_custom() -> int:
         f"{rep.score_atmospheric_retention:.4f}",
         f"v_esc / v_th(H2O) = {rep.water_retention_ratio:.2f} (exigido >= 6.0)",
     )
+
+    # Motores ab initio Chiral EFT e Hidrodinamica
+    chiral_eng = ChiralNuclearEngine()
+    ch_res = chiral_eng.solve_hoyle_resonance(u.alpha, u.alpha_s)
+    hab_solver = PlanetaryHabitabilitySolver()
+    hab_res = hab_solver.evaluate_habitability(u)
+
+    table.add_row(
+        "Chiral EFT (N2LO 1PE+2PE)",
+        f"[{'bold green' if ch_res.is_within_hoyle_window else 'bold red'}]{'ESTABLE' if ch_res.is_within_hoyle_window else 'COLAPSO'}[/]",
+        f"Delta E_R={ch_res.hoyle_shift_mev*1e3:+.1f} keV, mu_chiEFT={ch_res.compensatory_slope_mu:.4f}",
+    )
+    if hab_res.hydrodynamic_escape:
+        h_esc = hab_res.hydrodynamic_escape
+        table.add_row(
+            "Escape Hidrodinámico EUV",
+            f"[{'bold green' if h_esc.is_ocean_preserved else 'bold red'}]{'CONSERVADO' if h_esc.is_ocean_preserved else 'DESECADO'}[/]",
+            f"Pérdida: {h_esc.oceans_equivalent_lost:.2f} TO (de 5.0), K_tide={h_esc.tidal_correction_k_tide:.3f}",
+        )
     console.print(table)
 
     # Evaluación formal Lean 4
@@ -956,20 +1034,20 @@ def interactive_menu() -> None:
         table.add_column("Modulo / Simulacion Fisica", style="bold white")
         table.add_column("Garantia / Auditoria Formal", justify="left", style="green")
 
-        table.add_row("1", "Solvers Micro/Macro", "Evaluacion de Linea Base (Universo Estandar)", "[OK] 8 Filtros de Viabilidad 4D")
-        table.add_row("7", "Cosmologia", "Cosmologia Primordial & BBN Nucleosintesis", "[OK] Integrador Friedmann")
-        table.add_row("8", "Astrofisica & Clima", "Geofisica Planetaria, CHZ & Escape Jeans", "[OK] Criterio Isotermico Jeans")
+        table.add_row("1", "Solvers Micro/Macro", "Evaluacion de Linea Base (Universo Estandar)", "[OK] 7 Modulos & Motores ab initio")
+        table.add_row("2", "Cosmologia", "Cosmologia Primordial & BBN Nucleosintesis", "[OK] Integrador Friedmann")
+        table.add_row("3", "Astrofisica & Clima", "Geofisica Planetaria, CHZ & Escape Hidrodinamico", "[OK] Foto-evaporacion Erkaev / Jeans")
         table.add_section()
-        table.add_row("2", "Exploracion 4D", "Trazado de Curva de Equilibrio gamma(alpha)", "[OK] Homotopia Continua")
-        table.add_row("11", "Topologia 4D", "Espesor de Corredor Transversal (Vol_4D)", "[OK] Medida Lebesgue > 0")
-        table.add_row("3", "Exploracion 4D", "Muestreo Monte Carlo Multivariante", "[OK] Exploracion Estocastica")
-        table.add_row("4", "Diseno de Modelo", "Diseno y Test de Universo Personalizado", "[OK] Certificacion en Tiempo Real")
+        table.add_row("4", "Exploracion 4D", "Trazado de Curva de Equilibrio gamma(alpha)", "[OK] Homotopia Continua")
+        table.add_row("5", "Topologia 4D", "Espesor de Corredor Transversal (Vol_4D)", "[OK] Medida Lebesgue > 0")
+        table.add_row("6", "Exploracion 4D", "Muestreo Monte Carlo Multivariante", "[OK] Exploracion Estocastica")
+        table.add_row("7", "Diseno de Modelo", "Diseno y Test de Universo Personalizado", "[OK] Certificacion en Tiempo Real")
         table.add_section()
-        table.add_row("6", "Formal Verification", "Certificacion en Kernel Lean 4 (24 Lemas)", "[OK] Aritmetica Exacta Q")
+        table.add_row("8", "Formal Verification", "Certificacion en Kernel Lean 4 (24 Lemas)", "[OK] Aritmetica Exacta Q")
         table.add_row("9", "Analisis Numerico", "Auditoria de Convergencia y Malla O(h^4)", "[OK] Test Richardson / RK4")
         table.add_row("10", "Auditoria Rigurosa", "Estres Metodologico & Out-of-Sample", "[OK] Protocolo PRD (N=30)")
         table.add_section()
-        table.add_row("5", "Visualizacion", "Generacion de Figuras APS (PNG 300 DPI)", "[OK] Matplotlib PRD Theme")
+        table.add_row("11", "Visualizacion", "Generacion de Figuras APS (PNG 300 DPI)", "[OK] Matplotlib PRD Theme")
         table.add_row("12", "Publicacion", "Visor del Manuscrito Academico (PRD Preview)", "[OK] HTML5 + MathJax 3 Viewer")
         table.add_row("0", "Sistema", "Salir del Programa", "[dim]-[/dim]")
 
@@ -987,31 +1065,31 @@ def interactive_menu() -> None:
         elif choice == "1":
             cmd_standard(with_lean=True)
         elif choice == "2":
-            cmd_covary(with_lean=True)
+            cmd_bbn(with_lean=True)
         elif choice == "3":
-            s_str = Prompt.ask("  * Número de muestras Monte Carlo", default="300")
+            cmd_habitability(with_lean=True)
+        elif choice == "4":
+            cmd_covary(with_lean=True)
+        elif choice == "5":
+            cmd_corridor()
+        elif choice == "6":
+            s_str = Prompt.ask("  * Numero de muestras Monte Carlo", default="300")
             try:
                 s_int = int(s_str)
             except ValueError:
                 s_int = 300
             cmd_scan(n_samples=s_int, with_lean=True)
-        elif choice == "4":
-            cmd_custom()
-        elif choice == "5":
-            outdir = Prompt.ask("  * Directorio de salida para figuras", default=".")
-            cmd_plot(output_dir=outdir)
-        elif choice == "6":
-            cmd_lean()
         elif choice == "7":
-            cmd_bbn(with_lean=True)
+            cmd_custom()
         elif choice == "8":
-            cmd_habitability(with_lean=True)
+            cmd_lean()
         elif choice == "9":
             cmd_convergence()
         elif choice == "10":
             cmd_audit()
         elif choice == "11":
-            cmd_corridor()
+            outdir = Prompt.ask("  * Directorio de salida para figuras", default=".")
+            cmd_plot(output_dir=outdir)
         elif choice == "12":
             cmd_view_paper()
 
